@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Record Keeper</title>
+    <!-- Excel Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            /* Minimalist Color Palette */
+            --primary: #2563eb;       /* Royal Blue */
+            --bg-body: #f1f5f9;       /* Light Grey */
+            --bg-card: #ffffff;       /* White */
+            --text-main: #0f172a;     /* Dark Slate */
+            --text-muted: #64748b;    /* Muted Blue-Grey */
+            --border: #cbd5e1;        /* Border */
+            
+            /* Status Colors */
+            --paid-bg: #dcfce7;
+            --paid-text: #166534;
+            --unpaid-bg: #fee2e2;
+            --unpaid-text: #991b1b;
+            
+            /* Button Colors */
+            --btn-update-bg: #f59e0b; /* Amber/Yellow */
+            --btn-update-text: #000000; /* Black Text */
+        }
+
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        /* --- Header --- */
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 25px;
+            align-items: center;
+        }
+
+        @media(min-width: 768px) {
+            header { flex-direction: row; justify-content: space-between; align-items: center; }
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
+
+        .action-bar { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+        /* --- Buttons --- */
+        button {
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: opacity 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: white; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .btn-edit { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+        .btn-update {
+            background-color: var(--btn-update-bg) !important;
+            color: var(--btn-update-text) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* --- Card & Inputs --- */
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        @media(min-width: 768px) {
+            .input-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+        }
+
+        .form-group { display: flex; flex-direction: column; }
+        
+        .form-group label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        input, select {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background-color: #f8fafc;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            outline: none;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus {
+            background: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* --- Table (COMPACT) --- */
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: white;
+        }
+
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+
+        th {
+            background: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            text-align: left;
+            /* Header Padding */
+            padding: 12px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            /* COMPACT ROW PADDING HERE */
+            padding: 8px 12px; 
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            font-size: 0.9rem;
+            line-height: 1.2;
+        }
+
+        /* Compact Buttons inside table */
+        td button {
+            padding: 5px 10px; 
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+
+        tr:hover { background-color: #f8fafc; }
+
+        /* Status Badges */
+        .badge {
+            padding: 3px 8px; /* Slightly smaller badge padding */
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge-paid { background: var(--paid-bg); color: var(--paid-text); }
+        .badge-unpaid { background: var(--unpaid-bg); color: var(--unpaid-text); }
+        .badge-cat { background: #e0f2fe; color: #0369a1; }
+
+        /* Filter Banner */
+        .filter-banner {
+            background: #e2e8f0;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        /* Mobile View */
+        @media(max-width: 767px) {
+            thead { display: none; }
+            tr {
+                display: block;
+                background: white;
+                margin-bottom: 15px;
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 15px;
+            }
+            td {
+                display: flex;
+                justify-content: space-between;
+                padding: 6px 0; /* Compact mobile rows */
+                border-bottom: 1px solid #f1f5f9;
+            }
+            td:last-child { border: none; padding-top: 15px; justify-content: flex-end; }
+            td:first-child { font-weight: bold; background: #f8fafc; margin: -15px -15px 15px -15px; padding: 10px 15px; border-bottom: 1px solid var(--border); }
+            td::before {
+                content: attr(data-label);
+                font-weight: 700;
+                color: var(--text-muted);
+                font-size: 0.8rem;
+            }
+        }
+
+        #status {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: white; padding: 12px 25px; border-radius: 50px;
+            opacity: 0; pointer-events: none; transition: 0.3s; z-index: 999;
+        }
+        #status.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>📔 RECOVERY RECORD KEEPER</h1>
+        <div class="action-bar">
+            <!-- Hidden Inputs -->
+            <input type="file" id="excelImport" accept=".xlsx, .xls" hidden onchange="importExcel(this)">
+            <input type="file" id="backupImport" accept=".json" hidden onchange="restoreBackup(this)">
+            
+            <button class="btn-secondary" onclick="document.getElementById('excelImport').click()">📥 Import Excel</button>
+            <button class="btn-secondary" onclick="exportExcel()">📤 Export Excel</button>
+            <button class="btn-secondary" onclick="downloadBackup()">💾 Backup</button>
+            <button class="btn-secondary" onclick="document.getElementById('backupImport').click()">♻ Restore</button>
+        </div>
+    </header>
+
+    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+        <div>
+            <button class="btn-secondary" id="btnUndo" onclick="undo()" disabled>↩ Undo</button>
+            <button class="btn-secondary" id="btnRedo" onclick="redo()" disabled>↪ Redo</button>
+        </div>
+        <button class="btn-danger" onclick="clearAllData()">🗑 Reset App</button>
+    </div>
+
+    <!-- MAIN FORM -->
+    <div class="card">
+        <div class="input-grid">
+            <!-- Reference -->
+            <div class="form-group">
+                <label>Reference (14 Digits)</label>
+                <input type="text" id="inpRef" maxlength="14" inputmode="numeric" pattern="[0-9]*" 
+                       placeholder="Enter Ref..." oninput="handleRefInput(this)">
+            </div>
+            <!-- Name -->
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="inpName" placeholder="Client Name">
+            </div>
+            <!-- Amount -->
+            <div class="form-group">
+                <label>Amount</label>
+                <input type="number" id="inpAmount" placeholder="0.00" inputmode="decimal">
+            </div>
+            <!-- Bank -->
+            <div class="form-group">
+                <label>Bank</label>
+                <input type="text" id="inpBank" list="bankList" placeholder="Select Bank...">
+                <datalist id="bankList">
+                    <option value="MCB">
+                    <option value="MEEZAN">
+                    <option value="FAYSAL">
+                    <option value="ZARI">
+                    <option value="JAZZ CASH">
+                    <option value="EASY PAISA">
+                    <option value="POST OFFICE">
+                    <option value="QOUMI BACHAT">
+                </datalist>
+            </div>
+            <!-- Date -->
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="inpDate">
+            </div>
+            <!-- Category -->
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" id="inpCat" list="catList" placeholder="Select...">
+                <datalist id="catList">
+                    <option value="CP-114">
+                    <option value="03 To 03">
+                    <option value="04 To 06">
+                </datalist>
+            </div>
+            <!-- Status (Paid/Unpaid) -->
+            <div class="form-group">
+                <label>Status</label>
+                <select id="inpStatus" style="font-weight:bold;">
+                    <option value="Unpaid" style="color:var(--unpaid-text);">Unpaid</option>
+                    <option value="Paid" style="color:var(--paid-text);">Paid</option>
+                </select>
+            </div>
+
+            <!-- Buttons -->
+            <div class="form-group" style="justify-content:flex-end;">
+                <label>&nbsp;</label>
+                <div style="display:flex; gap:10px;">
+                    <button id="btnAdd" class="btn-primary" style="width:100%;" onclick="addRecord()">+ Add Record</button>
+                    <!-- Update button (Black text on Yellow) -->
+                    <button id="btnUpdate" class="btn-update" style="width:100%; display:none;" onclick="updateRecord()">✔ Update</button>
+                    <button id="btnCancel" class="btn-secondary" style="width:100%; display:none;" onclick="cancelEdit()">✖ Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-banner">
+        <div class="form-group" style="flex:1;">
+            <label>🔍 Search</label>
+            <input type="text" id="filterSearch" placeholder="Ref, Name..." oninput="renderTable()">
+        </div>
+        <div class="form-group">
+            <label>📂 Category</label>
+            <select id="filterCat" onchange="renderTable()">
+                <option value="">All</option>
+                <option value="CP-114">CP-114</option>
+                <option value="03 To 03">03 To 03</option>
+                <option value="04 To 06">04 To 06</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Status</label>
+            <select id="filterStatus" onchange="renderTable()">
+                <option value="">All</option>
+                <option value="Paid">Paid</option>
+                <option value="Unpaid">Unpaid</option>
+            </select>
+        </div>
+        <div style="padding-bottom:5px;">
+            <div id="displayCount" style="font-size:0.8rem;">Rows: 0</div>
+            <div id="displayTotal" style="font-weight:bold; font-size:1.1rem; color:var(--primary);">Total: 0</div>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:50px;">#</th>
+                    <th>Reference</th>
+                    <th>Name</th>
+                    <th>Amount</th>
+                    <th>Bank</th>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Manage</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="status">Notification</div>
+
+<script>
+    let records = [];
+    let historyStack = [];
+    let historyIndex = -1;
+    let editModeId = null;
+
+    window.onload = function() {
+        const saved = localStorage.getItem('recordApp_v5'); // New Key
+        if (saved) { try { records = JSON.parse(saved); } catch(e) { records=[]; } }
+        saveState(false);
+        renderTable();
+        document.getElementById('inpDate').valueAsDate = new Date();
+    };
+
+    function handleRefInput(el) {
+        if(el.value.length > 14) el.value = el.value.slice(0, 14);
+        if(el.value.length === 14) document.getElementById('inpName').focus();
+    }
+
+    // --- Core Functions ---
+
+    function addRecord() {
+        try {
+            const data = getFormData();
+            if (!data) return;
+            records.push({ id: Date.now(), ...data });
+            saveState();
+            renderTable();
+            resetForm();
+            showStatus("Record Added");
+        } catch (err) {
+            console.error(err);
+            alert("Error adding record: " + err.message);
+        }
+    }
+
+    function updateRecord() {
+        if(editModeId === null) return;
+        const data = getFormData();
+        if (!data) return;
+        const idx = records.findIndex(r => r.id === editModeId);
+        if(idx !== -1) {
+            records[idx] = { id: editModeId, ...data };
+            saveState();
+            renderTable();
+            cancelEdit();
+            showStatus("Updated Successfully");
+        }
+    }
+
+    function editRecord(id) {
+        const r = records.find(r => r.id === id);
+        if(!r) return;
+        
+        document.getElementById('inpRef').value = r.ref;
+        document.getElementById('inpName').value = r.name;
+        document.getElementById('inpAmount').value = r.amount;
+        document.getElementById('inpBank').value = r.bank;
+        document.getElementById('inpDate').value = r.date;
+        document.getElementById('inpCat').value = r.category;
+        document.getElementById('inpStatus').value = r.status || 'Unpaid';
+
+        editModeId = id;
+        document.getElementById('btnAdd').style.display = 'none';
+        document.getElementById('btnUpdate').style.display = 'block';
+        document.getElementById('btnCancel').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteRecord(id) {
+        if(editModeId === id) return alert("Cannot delete while editing");
+        if(confirm("Delete this record?")) {
+            records = records.filter(r => r.id !== id);
+            saveState();
+            renderTable();
+            showStatus("Deleted");
+        }
+    }
+
+    // --- Helpers ---
+
+    function getFormData() {
+        const ref = document.getElementById('inpRef').value;
+        const name = document.getElementById('inpName').value;
+        const amount = document.getElementById('inpAmount').value;
+        const bank = document.getElementById('inpBank').value;
+        const date = document.getElementById('inpDate').value;
+        const cat = document.getElementById('inpCat').value;
+        const status = document.getElementById('inpStatus').value;
+
+        if (!ref || !name || !amount) {
+            showStatus("Missing Ref, Name, or Amount");
+            return null;
+        }
+        return { ref, name, amount, bank, date, category: cat, status };
+    }
+
+    function resetForm() {
+        document.getElementById('inpRef').value = '';
+        document.getElementById('inpName').value = '';
+        document.getElementById('inpAmount').value = '';
+        document.getElementById('inpBank').value = '';
+        document.getElementById('inpCat').value = '';
+        document.getElementById('inpStatus').value = 'Unpaid';
+        document.getElementById('inpDate').valueAsDate = new Date();
+        cancelEdit();
+    }
+
+    function cancelEdit() {
+        editModeId = null;
+        document.getElementById('btnAdd').style.display = 'block';
+        document.getElementById('btnUpdate').style.display = 'none';
+        document.getElementById('btnCancel').style.display = 'none';
+    }
+
+    function saveState(history = true) {
+        if(history) {
+             if (historyIndex < historyStack.length - 1) historyStack = historyStack.slice(0, historyIndex + 1);
+             historyStack.push(JSON.stringify(records));
+             if (historyStack.length > 50) historyStack.shift();
+             historyIndex = historyStack.length - 1;
+        } else if(historyStack.length === 0) {
+            historyStack.push(JSON.stringify(records)); historyIndex = 0;
+        }
+        localStorage.setItem('recordApp_v5', JSON.stringify(records));
+        document.getElementById('btnUndo').disabled = historyIndex <= 0;
+        document.getElementById('btnRedo').disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    function undo() {
+        if(historyIndex > 0) {
+            historyIndex--;
+            records = JSON.parse(historyStack[historyIndex]);
+            localStorage.setItem('recordApp_v5', JSON.stringify(records));
+            renderTable();
+            document.getElementById('btnUndo').disabled = historyIndex <= 0;
+            document.getElementById('btnRedo').disabled = historyIndex >= historyStack.length - 1;
+        }
+    }
+
+    function redo() {
+        if(historyIndex < historyStack.length - 1) {
+            historyIndex++;
+            records = JSON.parse(historyStack[historyIndex]);
+            localStorage.setItem('recordApp_v5', JSON.stringify(records));
+            renderTable();
+            document.getElementById('btnUndo').disabled = historyIndex <= 0;
+            document.getElementById('btnRedo').disabled = historyIndex >= historyStack.length - 1;
+        }
+    }
+
+    function clearAllData() {
+        if(confirm("Delete ALL records?")) {
+            records = []; saveState(); renderTable(); resetForm();
+        }
+    }
+
+    // --- Table Render ---
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        const search = document.getElementById('filterSearch').value.toLowerCase();
+        const cat = document.getElementById('filterCat').value;
+        const statusFilter = document.getElementById('filterStatus').value;
+
+        const filtered = records.filter(r => {
+            const matchesSearch = (r.ref.toLowerCase().includes(search) || r.name.toLowerCase().includes(search) || r.bank.toLowerCase().includes(search));
+            const matchesCat = cat === "" || r.category === cat;
+            const matchesStatus = statusFilter === "" || r.status === statusFilter;
+            return matchesSearch && matchesCat && matchesStatus;
+        });
+
+        const total = filtered.reduce((s, r) => s + Number(r.amount), 0);
+        document.getElementById('displayCount').innerText = `Rows: ${filtered.length}`;
+        document.getElementById('displayTotal').innerText = `Total: ${total.toLocaleString()}`;
+
+        [...filtered].reverse().forEach((r, idx) => {
+            const statusClass = r.status === 'Paid' ? 'badge-paid' : 'badge-unpaid';
+            const row = `
+                <tr>
+                    <td data-label="#">${idx + 1}</td>
+                    <td data-label="Reference">${r.ref}</td>
+                    <td data-label="Name" style="font-weight:600;">${r.name}</td>
+                    <td data-label="Amount" style="color:var(--primary); font-weight:700;">${parseFloat(r.amount).toLocaleString()}</td>
+                    <td data-label="Bank">${r.bank}</td>
+                    <td data-label="Date" style="color:#64748b; font-size:0.85rem;">${r.date}</td>
+                    <td data-label="Category"><span class="badge badge-cat">${r.category || '-'}</span></td>
+                    <td data-label="Status"><span class="badge ${statusClass}">${r.status || 'Unpaid'}</span></td>
+                    <td data-label="Manage" style="text-align:right;">
+                        <button class="btn-edit" onclick="editRecord(${r.id})">✎</button>
+                        <button class="btn-danger" onclick="deleteRecord(${r.id})">🗑</button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function showStatus(msg) {
+        const el = document.getElementById('status');
+        el.innerText = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // --- Excel / Backup ---
+    function downloadBackup() {
+        if(!records.length) return showStatus("No Data");
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(records,null,2)],{type:'application/json'}));
+        a.download = `Backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    function restoreBackup(input) {
+        if(!input.files[0]) return;
+        const r = new FileReader();
+        r.onload = e => {
+            try {
+                const d = JSON.parse(e.target.result);
+                if(Array.isArray(d)) { if(confirm("Restore data?")) { records=d; saveState(); renderTable(); } }
+            } catch(x){ alert("Invalid File"); }
+            input.value = '';
+        };
+        r.readAsText(input.files[0]);
+    }
+
+    function exportExcel() {
+        if(!records.length) return showStatus("No Data");
+        const d = records.map(({id,...r}) => r);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d), "Records");
+        XLSX.writeFile(wb, `Records_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    function importExcel(input) {
+        if(!input.files[0]) return;
+        const r = new FileReader();
+        r.onload = e => {
+            const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            const newRecs = json.map(i => ({
+                id: Date.now() + Math.random(),
+                ref: i.ref||i.Reference||'', name: i.name||i.Name||'', amount: i.amount||i.Amount||0,
+                bank: i.bank||i.Bank||'', date: i.date||i.Date||'', category: i.category||i.Category||'',
+                status: i.status||i.Status||'Unpaid'
+            }));
+            if(confirm(`Import ${newRecs.length} rows?`)) { records=records.concat(newRecs); saveState(); renderTable(); }
+            input.value = '';
+        };
+        r.readAsArrayBuffer(input.files[0]);
+    }
+</script>
+
+</body>
+</html>
